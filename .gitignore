@@ -1,0 +1,9 @@
+node_modules/
+.env
+
+# LLM
+AGENTS.md
+CLAUDE.md
+
+# IntelliJ
+.idea/
