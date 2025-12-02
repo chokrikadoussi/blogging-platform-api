@@ -56,19 +56,24 @@ on tags_posts (postId);
 
 # Compte-rendu Codex
 ## Points forts
-- L’API couvre déjà les six opérations demandées (CRUD + filtrage) et embarque Express + `express.json()` : bonne base pédagogique.
-- L’isolation du serveur (`index.js`) facilite le démarrage et des interventions ciblées sur la logique métier.
+- Les six opérations exigées (CRUD + filtrage) sont déjà exposées dans `services/postService.js`, avec Express (`app.js`) et un pool MySQL (`utils/db.js`) prêt à consommer les requêtes.
+- La structure actuelle sépare l’entrée (`index.js`), la configuration (`app.js`) et le routeur métier, ce qui rend l’API facile à démarrer et à modifier.
+- Le README fournit le schéma des tables `posts`, `tags` et `tags_posts`, ce qui clarifie comment les données doivent être organisées.
+
 ## Points faibles
-- Le projet expose directement la connexion MySQL dans `app.js`, sans pool ni couche d’abstraction, ce qui limite la testabilité et l’évolution (modèle/DAO manquant).
-- L’insertion `POST /posts` ne persiste que la table `posts` et ne crée ni `tags` ni `tags_posts`, donc les tags déclarés dans la requête ne se reflètent pas dans les réponses.
-- La recherche (`GET /posts?term=…`) construit la clause `WHERE` en concaténant des strings, ouvrant aux injections SQL et empêchant l’usage de paramètres préparés.
+- Les requêtes SQL dans `services/postService.js` sont construites par concaténation (notamment `GET /posts`), ouvrant la porte aux injections SQL et limitant la réutilisation des paramètres.
+- `POST /posts` ne gère pas les tags : il écrit uniquement dans `posts` et renvoie l’ID sans alimenter `tags`/`tags_posts`, donc les réponses ne reflètent pas l’état complet attendu.
+- Il manque une validation formelle des payloads et une gestion centralisée des erreurs, ce qui entraîne des réponses d’erreur inconsistantes (callback -> `res.status(500).send(err)`).
+
 ## Points d’amélioration
-- Ajouter une couche service/modèle pour centraliser les requêtes SQL, récupérer les tags via des transactions et simplifier la répétition du SQL dans plusieurs routes.
-- Paramétrer correctement les requêtes filtrées (bind de `term`, pagination limitée) et renforcer la validation du payload (`title`, `content`, `category`, `tags` obligatoires, lengths raisonnables).
-- Compléter le README avec les exigences fonctionnelles + exemples de requêtes/réponses pour cadrer l’exercice (payloads d’insertions avec tags, structure de réponse attendue).
+- Formaliser une couche `models/post.js` et un `postService` qui exécutent des requêtes paramétrées (`mysql2` promise) avec transactions pour insérer/mettre à jour les tags avant de renvoyer le post complet.
+- Introduire des validations strictes (`title/content/category` requis, `tags` tableau, longueurs max) et un middleware d’erreurs pour fournir `400`, `404` ou `500` selon les scénarios métier.
+- Documenter les payloads/réponses (exemples cURL/JSON mentionnés dans le plan pédagogique) et normaliser les formats `res.status(...).json(...)` pour chaque endpoint.
+
 ## À approfondir
-- Confirmer les règles métier attendues (gestion des tags existants, unicité, suppression en cascade) pour éviter des comportements incohérents lors des CRUD.
-- Prévoir une stratégie de gestion des erreurs structurée (http status, messages) et définir une story d’API/endpoint standard pour chaque opération.
+- Ajouter des tests d’intégration (Jest + supertest ou similaire) pour couvrir `POST/GET/PUT/DELETE /posts` et faire en sorte que `npm test` exécute ces suites.
+- Compléter la documentation “Comment démarrer” avec les variables d’environnement requises (`DB_HOST`, `DB_USERNAME`, `DB_PASSWORD`, `DB_DATABASE`, `PORT`).
+- Rechercher la meilleure stratégie pour synchroniser les tags (création conditionnelle, suppression des relations obsolètes) et capturer les erreurs métier (`NotFound`, doublons, etc.).
 
 ## Plan d’implémentation service/modèle
 1. **Connexion centralisée (`db.js`)**

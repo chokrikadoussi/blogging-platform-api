@@ -1,5 +1,6 @@
 const postRouter = require("express").Router();
 const con = require("../utils/db");
+const postController = require("../models/post");
 
 postRouter.get('/', (req, res) => {
   return res.status(200).send('Hello World!');
@@ -27,7 +28,7 @@ postRouter.post('/posts', (req, res) => {
   if (!req.body.title || !req.body.content || !req.body.category || !req.body.tags) {
     return res.status(400).send({"message": "Please enter fields : title, content, category and tags"});
   }
-
+/*
   const qryPost = "INSERT INTO posts (title, content, category) VALUES (?, ?, ?)";
   // const qryTag = "INSERT INTO tags (name) VALUES (?)";
   const {title, content, category} = req.body;
@@ -40,7 +41,7 @@ postRouter.post('/posts', (req, res) => {
     newId = result.insertId;
     return res.status(200).send({newId});
   })
-
+*/
   /*
   con.query("SELECT * FROM posts WHERE id = ?", [newId], (err, result) => {
     if (err) {
@@ -49,6 +50,14 @@ postRouter.post('/posts', (req, res) => {
     return res.status(200).send(result);
   })
    */
+
+  postController.create(req.body).then(
+    result => {
+      return res.status(200).json(result);
+    }
+  );
+
+
 })
 
 postRouter.put('/posts/:id', (req, res) => {
