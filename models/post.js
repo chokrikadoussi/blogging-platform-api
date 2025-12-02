@@ -1,5 +1,15 @@
+/**
+ * Module de gestion des posts et des tags pour la plateforme de blogging.
+ * Fournit des fonctions CRUD et la gestion des associations tags-posts.
+ * Utilise MySQL via le module db.
+ */
 const db = require("../utils/db");
 
+/**
+ * Récupère tous les posts, éventuellement filtrés par un terme de recherche.
+ * @param {string} [term] - Terme de recherche pour filtrer les posts par titre, contenu ou catégorie.
+ * @returns {Promise<Array>} Liste des posts avec leurs tags.
+ */
 const findAll = async (term) => {
   const whereClause = term ? "WHERE title LIKE ? OR content LIKE ? OR category LIKE ?\n" : "";
   const query =
@@ -16,6 +26,11 @@ const findAll = async (term) => {
   return {...rows, tags: normalizeTags(rows.tags)};
 };
 
+/**
+ * Récupère un post par son identifiant.
+ * @param {number} id - Identifiant du post.
+ * @returns {Promise<Object|null>} Le post trouvé ou null si inexistant.
+ */
 const findById = async (id) => {
   const query =
     "SELECT p.id, title, content, category, JSON_ARRAYAGG(t.name) AS tags, createdAt, updatedAt\n" +
@@ -31,6 +46,15 @@ const findById = async (id) => {
   return {...post, tags: normalizeTags(post.tags)};
 }
 
+/**
+ * Crée un nouveau post et associe les tags.
+ * @param {Object} payload - Données du post à créer.
+ * @param {string} payload.title - Titre du post.
+ * @param {string} payload.content - Contenu du post.
+ * @param {string} payload.category - Catégorie du post.
+ * @param {Array<string>} payload.tags - Liste des tags.
+ * @returns {Promise<Object>} Le post créé avec ses tags.
+ */
 const create = async (payload) => {
   const {title, content, category, tags} = payload;
   const connection = await db.getConnection();
@@ -59,6 +83,11 @@ const create = async (payload) => {
   }
 }
 
+/**
+ * Supprime un post et ses associations de tags.
+ * @param {number} id - Identifiant du post à supprimer.
+ * @returns {Promise<boolean>} True si le post a été supprimé, false sinon.
+ */
 const deleteById = async (id) => {
   const connection = await db.getConnection();
 
@@ -76,6 +105,16 @@ const deleteById = async (id) => {
   }
 };
 
+/**
+ * Met à jour un post existant et ses tags associés.
+ * @param {number} id - Identifiant du post à mettre à jour.
+ * @param {Object} payload - Données à mettre à jour.
+ * @param {string} payload.title - Nouveau titre.
+ * @param {string} payload.content - Nouveau contenu.
+ * @param {string} payload.category - Nouvelle catégorie.
+ * @param {Array<string>} payload.tags - Nouveaux tags.
+ * @returns {Promise<Object|null>} Le post mis à jour ou null si inexistant.
+ */
 const updatePost = async (id, payload) => {
 
   const post = await findById(id);
@@ -108,6 +147,11 @@ module.exports = {
   updatePost,
 };
 
+/**
+ * Normalise le format des tags reçus depuis la base de données.
+ * @param {string|Array} raw - Tags bruts (JSON ou chaîne).
+ * @returns {Array<string>} Tableau de tags.
+ */
 const normalizeTags = (raw) => {
   if (!raw) return [];
   if (Array.isArray(raw)) return raw;
@@ -119,7 +163,12 @@ const normalizeTags = (raw) => {
   }
 }
 
-// Assure que tous les tags existent et retourne leurs IDs
+/**
+ * Vérifie l'existence des tags, crée ceux qui n'existent pas et retourne leurs IDs.
+ * @param {Object} connection - Connexion MySQL active.
+ * @param {Array<string>} tags - Liste des tags à assurer.
+ * @returns {Promise<Array<number>>} Tableau des IDs des tags.
+ */
 const ensureTags = async (connection, tags) => {
   if (!tags || tags.length === 0) return [];
   // Récupère les tags existants
@@ -137,7 +186,13 @@ const ensureTags = async (connection, tags) => {
   return tagIds;
 };
 
-// Remplace les tags associés à un post
+/**
+ * Remplace les associations tags-posts pour un post donné.
+ * @param {Object} connection - Connexion MySQL active.
+ * @param {number} postId - Identifiant du post.
+ * @param {Array<number>} tagIds - Liste des IDs de tags à associer.
+ * @returns {Promise<void>}
+ */
 const replacePostTags = async (connection, postId, tagIds) => {
   // Supprime les anciennes associations
   await connection.query("DELETE FROM tags_posts WHERE postId = ?", [postId]);
