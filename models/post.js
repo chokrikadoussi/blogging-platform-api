@@ -76,10 +76,28 @@ const deleteById = async (id) => {
   }
 };
 
-// TODO
 const updatePost = async (id, payload) => {
-  const qry = "UPDATE posts SET title = ?, content = ?, category = ? WHERE id = ?";
 
+  const post = await findById(id);
+  if (!post) {
+    return null;
+  }
+
+  const {title, content, category, tags} = payload;
+  const connection = await db.getConnection();
+
+  try {
+    await connection.beginTransaction();
+    const tagIds = await ensureTags(connection, normalizeTags(tags));
+    await connection.query("UPDATE posts SET title = ?, content = ?, category = ? WHERE id = ?", [title, content, category, id]);
+    await replacePostTags(connection, id, tagIds);
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+  return findById(id);
 }
 
 module.exports = {
