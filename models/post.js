@@ -96,6 +96,8 @@ const create = async (payload) => {
 const deleteById = async (id) => {
   const connection = await db.getConnection();
 
+  if (!id) return null;
+
   try {
     await connection.beginTransaction();
     await connection.query("DELETE FROM tags_posts WHERE postId = ?", [id]);
