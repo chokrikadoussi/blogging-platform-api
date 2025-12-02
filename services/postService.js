@@ -1,102 +1,70 @@
 const postRouter = require("express").Router();
-const con = require("../utils/db");
-const postController = require("../models/post");
+const postModel = require("../models/post");
+const validatePost = require("../middlewares/validatePost");
 
 postRouter.get('/', (req, res) => {
   return res.status(200).send('Hello World!');
 })
 
-postRouter.get('/posts', (req, res) => {
-  const term = req.query.term;
-  const params = term ? "WHERE title LIKE '%" + term + "%' OR content LIKE '%" + term + "%' OR category LIKE '%" + term + "%'\n" : "";
-  const qry = "SELECT p.id, title, content, category, json_arrayagg(t.name) as tags, createdAt, updatedAt\n" +
-    "FROM posts p\n" +
-    "LEFT JOIN tags_posts tp ON tp.postId = p.id\n" +
-    "LEFT JOIN tags t ON tp.tagId = t.id\n" +
-    params +
-    "GROUP BY p.id, p.title, p.content, p.category, p.createdAt, p.updatedAt;"
-  con.query(qry, (err, result) => {
-    if (err) {
-      return res.status(500).send(err);
+postRouter.get('/posts', async (req, res) => {
+  const term = req.query.term ?? null;
+  try {
+    const posts = await postModel.findAll(term);
+    if (posts) {
+      return res.status(200).send(posts);
     }
-
-    return res.status(200).send(result);
-  })
-})
-
-postRouter.post('/posts', (req, res) => {
-  if (!req.body.title || !req.body.content || !req.body.category || !req.body.tags) {
-    return res.status(400).send({"message": "Please enter fields : title, content, category and tags"});
+    return res.status(404).send({"message": "No posts found."});
+  } catch (error) {
+    console.error(error);
+    return res.status(500).send({"message": "An error occurred while retrieving posts."});
   }
-/*
-  const qryPost = "INSERT INTO posts (title, content, category) VALUES (?, ?, ?)";
-  // const qryTag = "INSERT INTO tags (name) VALUES (?)";
-  const {title, content, category} = req.body;
-  let newId = "";
-
-  con.query(qryPost, [title, content, category], (err, result) => {
-    if (err) {
-      return res.status(500).send(err);
-    }
-    newId = result.insertId;
-    return res.status(200).send({newId});
-  })
-*/
-  /*
-  con.query("SELECT * FROM posts WHERE id = ?", [newId], (err, result) => {
-    if (err) {
-      return res.status(500).send(err);
-    }
-    return res.status(200).send(result);
-  })
-   */
-
-  postController.create(req.body).then(
-    result => {
-      return res.status(200).json(result);
-    }
-  );
-
-
 })
 
-postRouter.put('/posts/:id', (req, res) => {
-  const qry = "UPDATE posts SET title = ?, content = ?, category = ? WHERE id = ?";
-  const {title, content, category} = req.body;
-  con.query(qry, [title, content, category, req.params.id], (err, result) => {
-    if (err) {
-      return res.status(500).send(err);
+postRouter.post('/posts', validatePost, async (req, res) => {
+  try {
+    const post = await postModel.create(req.body);
+    return res.status(200).json(post);
+  } catch (error) {
+    console.error(error);
+    return res.status(500).send({"message": "An error occurred while creating the post."});
+  }
+});
+
+postRouter.put('/posts/:id', validatePost, async (req, res) => {
+  const id = req.params.id;
+  const {title, content, category, tags} = req.body;
+
+
+  try {
+    const updatedPost = await postModel.updatePost(id, {title, content, category, tags});
+    if (!updatedPost) {
+      return res.status(404).send({"message": "Post not found"});
     }
-    return res.status(200).send({"message": "Post successfully updated!"});
-  })
+    return res.status(200).json(updatedPost);
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).send({"message": "An error occurred while updating the post."});
+  }
 })
 
-postRouter.delete('/posts/:id', (req, res) => {
-  const qry = "DELETE FROM posts WHERE id = ?";
-  con.query(qry, [req.params.id], (err, result) => {
-    if (err) {
-      return res.status(500).send(err);
-    }
-    return res.status(200).send({"message": "Post successfully deleted!"});
-  })
+postRouter.delete('/posts/:id', async (req, res) => {
+  const id = req.params.id;
+  const isDeleted = await postModel.deleteById(id);
+  if (!isDeleted) {
+    return res.status(404).send({"message": "Post not found"});
+  }
+  return res.status(204);
 })
 
-postRouter.get('/posts/:id', (req, res) => {
-  const qry = "SELECT p.id, title, content, category, json_arrayagg(t.name) as tags, createdAt, updatedAt\n" +
-    "FROM posts p\n" +
-    "LEFT JOIN tags_posts tp ON tp.postId = p.id\n" +
-    "LEFT JOIN tags t ON tp.tagId = t.id\n" +
-    "WHERE p.id = ?\n" +
-    "GROUP BY p.id, p.title, p.content, p.category, p.createdAt, p.updatedAt;"
+postRouter.get('/posts/:id', async (req, res) => {
+  const id = req.params.id;
+  const post = await postModel.findById(id);
 
-  con.query(qry, [req.params.id], (err, result) => {
-    if (err) {
-      console.error(err);
-      return res.status(404).send({"message": "Could not find post"});
-    }
-
-    return res.status(200).send(result);
-  })
+  if (!post) {
+    return res.status(404).send({"message": "Post not found"});
+  }
+  return res.status(200).json(post);
 })
 
 module.exports = postRouter;

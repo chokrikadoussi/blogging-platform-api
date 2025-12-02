@@ -7,8 +7,8 @@ const db = require("../utils/db");
 
 /**
  * Récupère tous les posts, éventuellement filtrés par un terme de recherche.
- * @param {string} [term] - Terme de recherche pour filtrer les posts par titre, contenu ou catégorie.
- * @returns {Promise<Array>} Liste des posts avec leurs tags.
+ * @param {string|null} [term] - Terme de recherche pour filtrer les posts par titre, contenu ou catégorie.
+ * @returns {Array} Liste des posts avec leurs tags.
  */
 const findAll = async (term) => {
   const whereClause = term ? "WHERE title LIKE ? OR content LIKE ? OR category LIKE ?\n" : "";
@@ -21,9 +21,14 @@ const findAll = async (term) => {
     "GROUP BY p.id, p.title, p.content, p.category, p.createdAt, p.updatedAt;";
 
   const params = term ? [`%${term}%`, `%${term}%`, `%${term}%`] : [];
-  const [rows] = await db.query(query, params);
+  try {
+    const [rows] = await db.query(query, params);
+    return {...rows};
+  } catch (error) {
+    console.error(error);
+    return null;
+  }
 
-  return {...rows, tags: normalizeTags(rows.tags)};
 };
 
 /**
